@@ -15,18 +15,12 @@
 //
 //   - If both are set, the CPU may not reorder the instruction at all.
 //
-// These four modes correspond to other well-known memory models on other CPUs.
-// On ARM, aq corresponds to a dmb ishst, aq+rl corresponds to a dmb ish. On
-// Intel, aq corresponds to an lfence, rl to an sfence, and aq+rl to an mfence
-// (or a lock prefix).
-//
 // Go's memory model requires that
-//   - if a read happens after a write, the read must observe the write, and
-//     that
+//   - if a atomic read/write happens after a read/write, the first operation
+//     must be observe before the second.
 //   - if a read happens concurrently with a write, the read may observe the
 //     write.
-// aq is sufficient to guarantee this, so that's what we use here. (This jibes
-// with ARM, which uses dmb ishst.)
+// aq|rl is sufficient to guarantee this, so that's what we use here.
 
 #include "textflag.h"
 
@@ -75,47 +69,52 @@ cas_fail:
 // func Load(ptr *uint32) uint32
 TEXT ·Load(SB),NOSPLIT|NOFRAME,$0-12
 	MOV	ptr+0(FP), A0
-	LRW	(A0), A0
+	FENCE // fence rw,rw
+	MOVWU	(A0), A0
+	FENCE // fence r,rw is sufficient
 	MOVW	A0, ret+8(FP)
 	RET
 
 // func Load8(ptr *uint8) uint8
 TEXT ·Load8(SB),NOSPLIT|NOFRAME,$0-9
 	MOV	ptr+0(FP), A0
-	FENCE
+	FENCE // fence rw,rw
 	MOVBU	(A0), A1
-	FENCE
+	FENCE // fence r,rw is sufficient
 	MOVB	A1, ret+8(FP)
 	RET
 
 // func Load64(ptr *uint64) uint64
 TEXT ·Load64(SB),NOSPLIT|NOFRAME,$0-16
 	MOV	ptr+0(FP), A0
-	LRD	(A0), A0
+	FENCE // fence rw,rw
+	MOV	(A0), A0
+	FENCE // fence r,rw is sufficient
 	MOV	A0, ret+8(FP)
 	RET
 
 // func Store(ptr *uint32, val uint32)
 TEXT ·Store(SB), NOSPLIT, $0-12
 	MOV	ptr+0(FP), A0
-	MOVW	val+8(FP), A1
-	AMOSWAPW A1, (A0), ZERO
+	MOVW val+8(FP), A1
+	FENCE // fence rw,w is sufficient
+	MOVW A1, (A0)
 	RET
 
 // func Store8(ptr *uint8, val uint8)
 TEXT ·Store8(SB), NOSPLIT, $0-9
 	MOV	ptr+0(FP), A0
 	MOVBU	val+8(FP), A1
-	FENCE
-	MOVB	A1, (A0)
-	FENCE
+	FENCE // fence rw,w is sufficient
+	MOVB A1, (A0)
 	RET
 
 // func Store64(ptr *uint64, val uint64)
 TEXT ·Store64(SB), NOSPLIT, $0-16
 	MOV	ptr+0(FP), A0
 	MOV	val+8(FP), A1
-	AMOSWAPD A1, (A0), ZERO
+	FENCE // fence rw,w is sufficient
+	MOV A1, (A0)
 	RET
 
 TEXT ·Casp1(SB), NOSPLIT, $0-25
