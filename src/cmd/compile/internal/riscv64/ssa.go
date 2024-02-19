@@ -511,46 +511,34 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.To.Sym = ssagen.BoundsCheckFunc[v.AuxInt]
 		s.UseArgs(16) // space used in callee args area by assembly stubs
 
-	case ssa.OpRISCV64LoweredAtomicLoad8:
-		s.Prog(riscv.AFENCE)
-		p := s.Prog(riscv.AMOVBU)
-		p.From.Type = obj.TYPE_MEM
-		p.From.Reg = v.Args[0].Reg()
-		p.To.Type = obj.TYPE_REG
-		p.To.Reg = v.Reg0()
-		s.Prog(riscv.AFENCE)
-
-	case ssa.OpRISCV64LoweredAtomicLoad32, ssa.OpRISCV64LoweredAtomicLoad64:
-		as := riscv.ALRW
-		if v.Op == ssa.OpRISCV64LoweredAtomicLoad64 {
-			as = riscv.ALRD
+	case ssa.OpRISCV64LoweredAtomicLoad8, ssa.OpRISCV64LoweredAtomicLoad32, ssa.OpRISCV64LoweredAtomicLoad64:
+		s.Prog(riscv.AFENCE) // fence rw,rw
+		as := riscv.AMOV
+		if v.Op == ssa.OpRISCV64LoweredAtomicLoad32 {
+			as = riscv.AMOVWU
+		} else if v.Op == ssa.OpRISCV64LoweredAtomicLoad8 {
+			as = riscv.AMOVBU
 		}
 		p := s.Prog(as)
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = v.Args[0].Reg()
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg0()
+		s.Prog(riscv.AFENCE) // fence r,rw is sufficient
 
-	case ssa.OpRISCV64LoweredAtomicStore8:
-		s.Prog(riscv.AFENCE)
-		p := s.Prog(riscv.AMOVB)
-		p.From.Type = obj.TYPE_REG
-		p.From.Reg = v.Args[1].Reg()
-		p.To.Type = obj.TYPE_MEM
-		p.To.Reg = v.Args[0].Reg()
-		s.Prog(riscv.AFENCE)
-
-	case ssa.OpRISCV64LoweredAtomicStore32, ssa.OpRISCV64LoweredAtomicStore64:
-		as := riscv.AAMOSWAPW
-		if v.Op == ssa.OpRISCV64LoweredAtomicStore64 {
-			as = riscv.AAMOSWAPD
+	case ssa.OpRISCV64LoweredAtomicStore8, ssa.OpRISCV64LoweredAtomicStore32, ssa.OpRISCV64LoweredAtomicStore64:
+		s.Prog(riscv.AFENCE) // fence rw,w is sufficient
+		as := riscv.AMOV
+		if v.Op == ssa.OpRISCV64LoweredAtomicStore32 {
+			as = riscv.AMOVW
+		} else if v.Op == ssa.OpRISCV64LoweredAtomicStore8 {
+			as = riscv.AMOVB
 		}
 		p := s.Prog(as)
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[1].Reg()
 		p.To.Type = obj.TYPE_MEM
 		p.To.Reg = v.Args[0].Reg()
-		p.RegTo2 = riscv.REG_ZERO
 
 	case ssa.OpRISCV64LoweredAtomicAdd32, ssa.OpRISCV64LoweredAtomicAdd64:
 		as := riscv.AAMOADDW

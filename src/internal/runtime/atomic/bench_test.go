@@ -19,12 +19,32 @@ func BenchmarkAtomicLoad64(b *testing.B) {
 	}
 }
 
+func BenchmarkAtomicLoad64Parallel(b *testing.B) {
+	var x [128]uint64
+	sink = &x
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = atomic.Load64(&x[63])
+		}
+	})
+}
+
 func BenchmarkAtomicStore64(b *testing.B) {
 	var x uint64
 	sink = &x
 	for i := 0; i < b.N; i++ {
 		atomic.Store64(&x, 0)
 	}
+}
+
+func BenchmarkAtomicStore64Parallel(b *testing.B) {
+	var x [128]uint64
+	sink = &x
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			atomic.Store64(&x[63], 0)
+		}
+	})
 }
 
 func BenchmarkAtomicLoad(b *testing.B) {
@@ -35,12 +55,43 @@ func BenchmarkAtomicLoad(b *testing.B) {
 	}
 }
 
+func BenchmarkAtomicLoadParallel(b *testing.B) {
+	var x [256]uint32
+	sink = &x
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = atomic.Load(&x[127])
+		}
+	})
+}
+
 func BenchmarkAtomicStore(b *testing.B) {
 	var x uint32
 	sink = &x
 	for i := 0; i < b.N; i++ {
 		atomic.Store(&x, 0)
 	}
+}
+
+func BenchmarkAtomicStoreParallel(b *testing.B) {
+	var x [256]uint32
+	sink = &x
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			atomic.Store(&x[127], 0)
+		}
+	})
+}
+
+func BenchmarkAtomicStoreLoad64Parallel(b *testing.B) {
+	var x [128]uint64
+	sink = &x
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			atomic.Store64(&x[63], 0)
+			_ = atomic.Load64(&x[63])
+		}
+	})
 }
 
 func BenchmarkAnd8(b *testing.B) {
